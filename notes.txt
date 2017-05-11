@@ -1,13 +1,19 @@
+<<<<<<< HEAD
 Philippe
 <<<<<<< HEAD
 <<<<<<< HEAD
+=======
+>>>>>>> parent of 32dd40f... test
 je suis ZRO et ALX.
 73 de F5FDR
 88 aux YLs
 Je ne sais ce que je suis...
 voici la ligne crée par *** GQS ***
+<<<<<<< HEAD
 bon, on va manger ?
 =======
 >>>>>>> parent of 086365b... commit 6
 =======
 >>>>>>> parent of 086365b... commit 6
+=======
+>>>>>>> parent of 32dd40f... test
