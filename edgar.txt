@@ -1,1 +1,108 @@
-test fichier
+#define	__mainF__
+//---------------------------------------------------------------------------
+#include <vcl\vcl.h>
+#pragma hdrstop
+
+#include "defs.h"
+#include "map.h"
+#include "MainRem.h"
+#include "serialth.h"
+#include "setup.h"
+//---------------------------------------------------------------------------
+#pragma resource "*.dfm"
+
+   	OPTIONS					Opt = {
+                    				"COM2"		,			/* Port RS232 par défaut */
+    								9600		,			/* Vitesse du port RS232 par defaut */
+//									7			,			/* Nb. bits par défaut */
+//									EVENPARITY	,			/* Type de parité par défaut */
+									8			,			/* Nb. bits par défaut */
+									NOPARITY	,			/* Type de parité par défaut */
+									ONESTOPBIT	,			/* Nb. bits de stop par défaut */
+                    				32768		,			/* Taille du buffer RX RS232 par défaut */
+                    				32768		,			/* Taille du buffer TX RS232 par défaut */
+                                    true		,			/* Mode DEBUG du port série */
+                                    false		,			/* Setup non modifié */
+                                    true                    /* Mode binaire */
+    			  				  };
+	HANDLE					hMutexApp = NULL	;			/* Mutex test application chargée */
+	EVENTS_HANDLE			EventsThread		;			/* Liste des 'Event' dans la thread */
+    THREADINFOS				thiSerialThread		;			/* Thread lecture série */
+	TForm1 					*Form1;
+
+//---------------------------------------------------------------------------
+__fastcall TForm1::TForm1(TComponent* Owner)
+	: TForm(Owner)
+{
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::FormCreate(TObject *Sender)
+{
+	BOOL		bErreurApplication = false;
+    BOOL		bResult = false;
+
+	/* Creation d'un MUTEX pour tester la présence du logiciel */
+
+	hMutexApp = CreateMutex(NULL, false, "ModuleSérie");
+	if (GetLastError() == ERROR_ALREADY_EXISTS) {
+		MessageBox(Form1->Handle, "Logiciel déjà en service.", "Erreur programme", MB_ICONSTOP);
+		bErreurApplication = true;
+	}
+
+	if (bErreurApplication == false) {
+		thiSerialThread.bThreadOn	= OFF;					/* Vérouille la thread pour attente d'initialisation */
+	    thiSerialThread.hwnd 		= Form1->Handle;         /* Passe l'Handle de ma fenètre principale */
+		thiSerialThread.lpOpt		= &Opt;
+	    thiSerialThread.iPriority	= THREAD_PRIORITY_BELOW_NORMAL;	/* Priorité de la thread du port série */
+	}
+
+	if (bErreurApplication == false) {
+    	thiSerialThread.hThread   = CreateThread(NULL,
+    						 		   			 0,
+                             		   			 (LPTHREAD_START_ROUTINE) SerialThread,
+                                       			 (LPVOID)&thiSerialThread,
+                             		   			 0,
+                             		   			 &thiSerialThread.dwThreadId);
+
+		if (thiSerialThread.hThread == NULL) {
+			MessageBox(Form1->Handle, "Défaut de création de la gestion du port série", "Défaut d'initialisation", MB_ICONSTOP);
+			bErreurApplication = true;
+		}
+        else {
+			bResult = SetThreadPriority(thiSerialThread.hThread, thiSerialThread.iPriority);
+	    	if (bResult == false) {
+				MessageBox(Form1->Handle, "Défaut de priorité de la 'Thread' du port série", "Défaut d'initialisation", MB_ICONSTOP);
+				bErreurApplication = true;
+			}
+			else {
+    			thiSerialThread.hEventThread = CreateEvent(NULL, FALSE, FALSE, "EventSerialTh");
+				if (thiSerialThread.hEventThread != NULL) {
+    				addEventHandle(&EventsThread, thiSerialThread.hEventThread);
+                    thiSerialThread.hEventSerial = CreateEvent(NULL, FALSE, FALSE, "InitialSerialPort");
+                    if (thiSerialThread.hEventThread != NULL) {
+	    				addEventHandle(&EventsThread, thiSerialThread.hEventSerial);
+                    }
+                    else {
+						MessageBox(Form1->Handle, "Défaut de création d'un évènement pour l'initialisation du port série", "Défaut d'initialisation", MB_ICONSTOP);
+						bErreurApplication = true;
+                    }
+    			}
+            	else {
+					MessageBox(Form1->Handle, "Défaut de création d'un évènement pour la 'Thread' du port série", "Défaut d'initialisation", MB_ICONSTOP);
+					bErreurApplication = true;
+                }
+            }
+		}
+	}
+
+	/* Mise en service de la thread du port série */
+
+	if (bErreurApplication == false) {
+		thiSerialThread.bThreadOn = ON;      		/* Met en service la Thread principale */
+		SetEvent(thiSerialThread.hEventThread);
+    }
+    else {
+		PostMessage(Form1->Handle, WM_QUIT, NULL, NULL);
+    }
+}
+
